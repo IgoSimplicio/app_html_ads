@@ -1,14 +1,12 @@
 package com.isl.audioautocut;
 
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
-import android.view.View;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.Button;
 import android.widget.LinearLayout;
-import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import com.google.android.gms.ads.AdRequest;
@@ -16,8 +14,6 @@ import com.google.android.gms.ads.AdSize;
 import com.google.android.gms.ads.AdView;
 import com.google.android.gms.ads.MobileAds;
 import com.google.android.gms.ads.RequestConfiguration;
-import com.google.android.gms.ads.initialization.InitializationStatus;
-import com.google.android.gms.ads.initialization.OnInitializationCompleteListener;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -38,9 +34,7 @@ public class MainActivity extends AppCompatActivity {
     private OkHttpClient client;
     private Gson gson;
     private String currentConfig = "";
-    private TextView statusText;
-    private Button btnTestBanner;
-    private Button btnTestConfig;
+    private boolean isConfigLoaded = false;
     
     private final String GITHUB_HTML_URL = "https://IgoSimplicio.github.io/app_html_ads/";
     private final String GITHUB_CONFIG_URL = "https://raw.githubusercontent.com/IgoSimplicio/app_html_ads/main/anuncios.json";
@@ -50,42 +44,26 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         
+        Log.d(TAG, "🚀 App iniciado");
+        
         // Inicializar componentes
         webView = findViewById(R.id.webview);
         bannerContainer = findViewById(R.id.banner_container);
-        statusText = findViewById(R.id.status_text);
-        btnTestBanner = findViewById(R.id.btn_test_banner);
-        btnTestConfig = findViewById(R.id.btn_test_config);
         
-        client = new OkHttpClient();
+        client = new OkHttpClient.Builder()
+                .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                .build();
         gson = new Gson();
-        
-        // Configurar botões de teste
-        setupTestButtons();
-        
-        // Mostrar status inicial
-        updateStatus("Iniciando app...");
         
         // Configurar WebView
         setupWebView();
         
-        // Inicializar AdMob com configuração de teste
+        // Inicializar AdMob
         initializeAdMob();
         
-        // Carregar configuração
+        // Carregar configuração do GitHub
         loadConfigFromGitHub();
-    }
-    
-    private void setupTestButtons() {
-        btnTestBanner.setOnClickListener(v -> {
-            updateStatus("Testando banner manual...");
-            testBannerDirectly();
-        });
-        
-        btnTestConfig.setOnClickListener(v -> {
-            updateStatus("Testando configuração...");
-            testConfigDirectly();
-        });
     }
     
     private void setupWebView() {
@@ -95,63 +73,66 @@ public class MainActivity extends AppCompatActivity {
             webSettings.setDomStorageEnabled(true);
             webSettings.setLoadWithOverviewMode(true);
             webSettings.setUseWideViewPort(true);
+            webSettings.setAllowFileAccess(true);
+            webSettings.setAllowContentAccess(true);
             
-            webView.addJavascriptInterface(new WebAppInterface(this), "AndroidInterface");
+            // Adicionar interface JavaScript - ISSO É CRÍTICO!
+            WebAppInterface interface_ = new WebAppInterface(this);
+            webView.addJavascriptInterface(interface_, "AndroidInterface");
+            Log.d(TAG, "✅ JavaScriptInterface adicionado");
             
             webView.setWebViewClient(new WebViewClient() {
                 @Override
                 public void onPageFinished(WebView view, String url) {
                     super.onPageFinished(view, url);
-                    updateStatus("HTML carregado: " + url);
-                    sendConfigToWebView();
-                }
-                
-                @Override
-                public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-                    super.onReceivedError(view, errorCode, description, failingUrl);
-                    updateStatus("Erro WebView: " + description);
+                    Log.d(TAG, "📄 Página carregada: " + url);
+                    
+                    // Aguardar um pouco e enviar configuração
+                    new Handler().postDelayed(() -> {
+                        sendConfigToWebView();
+                    }, 1000);
                 }
             });
             
+            Log.d(TAG, "📱 Carregando HTML: " + GITHUB_HTML_URL);
             webView.loadUrl(GITHUB_HTML_URL);
-            updateStatus("Carregando HTML...");
             
         } catch (Exception e) {
-            updateStatus("Erro WebView: " + e.getMessage());
+            Log.e(TAG, "❌ Erro WebView: " + e.getMessage());
         }
     }
     
     private void initializeAdMob() {
-        updateStatus("Inicializando AdMob...");
-        
-        // Configurar dispositivos de teste
-        RequestConfiguration configuration = new RequestConfiguration.Builder()
-                .setTestDeviceIds(Arrays.asList("ABCDEF012345"))
-                .build();
-        MobileAds.setRequestConfiguration(configuration);
-        
-        MobileAds.initialize(this, initializationStatus -> {
-            updateStatus("AdMob inicializado!");
-            Log.d(TAG, "AdMob status: " + initializationStatus.toString());
-        });
+        try {
+            // Configurar dispositivos de teste
+            RequestConfiguration configuration = new RequestConfiguration.Builder()
+                    .setTestDeviceIds(Arrays.asList("ABCDEF012345"))
+                    .build();
+            MobileAds.setRequestConfiguration(configuration);
+            
+            MobileAds.initialize(this, initializationStatus -> {
+                Log.d(TAG, "✅ AdMob inicializado");
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Erro AdMob: " + e.getMessage());
+        }
     }
     
     private void loadConfigFromGitHub() {
-        updateStatus("Buscando configuração...");
-        Log.d(TAG, "URL: " + GITHUB_CONFIG_URL);
+        Log.d(TAG, "🌐 Carregando config de: " + GITHUB_CONFIG_URL);
         
         Request request = new Request.Builder()
                 .url(GITHUB_CONFIG_URL)
+                .addHeader("User-Agent", "Android App")
+                .addHeader("Accept", "application/json")
                 .get()
                 .build();
         
         client.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
+                Log.e(TAG, "❌ Falha na requisição: " + e.getMessage());
                 runOnUiThread(() -> {
-                    String erro = "Falha: " + e.getMessage();
-                    updateStatus(erro);
-                    Log.e(TAG, erro, e);
                     loadDefaultConfig();
                 });
             }
@@ -161,38 +142,44 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     if (response.isSuccessful()) {
                         String body = response.body().string();
-                        Log.d(TAG, "Config recebida: " + body);
+                        Log.d(TAG, "✅ Config recebida: " + body);
                         
                         runOnUiThread(() -> {
-                            updateStatus("Config carregada!");
                             currentConfig = body;
+                            isConfigLoaded = true;
+                            Log.d(TAG, "📦 Config salva, tamanho: " + currentConfig.length());
+                            
+                            // Processar e mostrar banner
                             processConfigAndShowBanner();
+                            
+                            // Enviar para WebView
+                            sendConfigToWebView();
                         });
                     } else {
-                        runOnUiThread(() -> {
-                            updateStatus("HTTP " + response.code());
-                            loadDefaultConfig();
-                        });
+                        Log.e(TAG, "❌ HTTP " + response.code());
+                        runOnUiThread(() -> loadDefaultConfig());
                     }
                 } catch (Exception e) {
-                    runOnUiThread(() -> {
-                        updateStatus("Erro: " + e.getMessage());
-                        loadDefaultConfig();
-                    });
+                    Log.e(TAG, "❌ Erro: " + e.getMessage());
+                    runOnUiThread(() -> loadDefaultConfig());
                 }
             }
         });
     }
     
     private void loadDefaultConfig() {
-        updateStatus("Usando config padrão");
-        currentConfig = "{\"admob\":{\"app_id\":\"ca-app-pub-5799980230102893~3570820869\",\"banners\":[{\"ad_unit_id\":\"ca-app-pub-5799980230102893/9398812287\",\"ativo\":true}]}}";
+        Log.d(TAG, "📝 Usando config padrão");
+        currentConfig = "{\"app\":{\"nome\":\"Audio Auto Cut\"},\"admob\":{\"app_id\":\"ca-app-pub-5799980230102893~3570820869\",\"banners\":[{\"ad_unit_id\":\"ca-app-pub-5799980230102893/9398812287\",\"ativo\":true}]},\"conteudo\":{\"url\":\"https://www.google.com\"}}";
+        isConfigLoaded = true;
         processConfigAndShowBanner();
+        sendConfigToWebView();
     }
     
     private void processConfigAndShowBanner() {
         try {
+            Log.d(TAG, "🔄 Processando config para banner");
             JsonObject config = gson.fromJson(currentConfig, JsonObject.class);
+            
             String bannerId = "ca-app-pub-5799980230102893/9398812287"; // Padrão
             
             if (config.has("admob")) {
@@ -203,16 +190,16 @@ public class MainActivity extends AppCompatActivity {
                         JsonObject banner = banners.get(0).getAsJsonObject();
                         if (banner.has("ad_unit_id")) {
                             bannerId = banner.get("ad_unit_id").getAsString();
+                            Log.d(TAG, "📋 Banner ID da config: " + bannerId);
                         }
                     }
                 }
             }
             
-            updateStatus("ID Banner: " + bannerId);
             loadBanner(bannerId);
             
         } catch (Exception e) {
-            updateStatus("Erro processando config: " + e.getMessage());
+            Log.e(TAG, "❌ Erro processando config: " + e.getMessage());
             loadBanner("ca-app-pub-5799980230102893/9398812287");
         }
     }
@@ -220,130 +207,122 @@ public class MainActivity extends AppCompatActivity {
     private void loadBanner(String adUnitId) {
         runOnUiThread(() -> {
             try {
-                updateStatus("Carregando banner: " + adUnitId);
+                Log.d(TAG, "📢 Carregando banner: " + adUnitId);
                 
                 if (adView != null) {
                     adView.destroy();
                 }
                 
-                // Criar novo banner
                 adView = new AdView(this);
                 adView.setAdUnitId(adUnitId);
                 adView.setAdSize(AdSize.BANNER);
                 
-                // Limpar e adicionar ao container
                 bannerContainer.removeAllViews();
                 bannerContainer.addView(adView);
                 
-                // Configurar listener para debug
+                // Listener para debug
                 adView.setAdListener(new com.google.android.gms.ads.AdListener() {
                     @Override
                     public void onAdLoaded() {
                         super.onAdLoaded();
-                        updateStatus("✅ Banner carregado!");
-                        Log.d(TAG, "Banner carregado com sucesso");
+                        Log.d(TAG, "✅ Banner carregado!");
+                        
+                        // Notificar HTML
+                        sendCommandToWebView("bannerLoaded");
                     }
                     
                     @Override
                     public void onAdFailedToLoad(com.google.android.gms.ads.LoadAdError loadAdError) {
                         super.onAdFailedToLoad(loadAdError);
-                        String erro = "❌ Falha ao carregar banner: " + loadAdError.getMessage();
-                        updateStatus(erro);
-                        Log.e(TAG, erro);
+                        Log.e(TAG, "❌ Falha banner: " + loadAdError.getMessage());
                         
-                        // Mostrar erro detalhado
-                        String errorDetails = "Código: " + loadAdError.getCode() + "\n" +
-                                             "Mensagem: " + loadAdError.getMessage() + "\n" +
-                                             "Domínio: " + loadAdError.getDomain();
-                        Log.e(TAG, errorDetails);
-                    }
-                    
-                    @Override
-                    public void onAdClicked() {
-                        super.onAdClicked();
-                        Log.d(TAG, "Banner clicado");
+                        // Notificar HTML
+                        sendCommandToWebView("bannerFailed");
                     }
                 });
                 
-                // Criar requisição de teste
                 AdRequest adRequest = new AdRequest.Builder().build();
                 adView.loadAd(adRequest);
                 
             } catch (Exception e) {
-                updateStatus("Erro ao carregar banner: " + e.getMessage());
-                Log.e(TAG, "Erro loadBanner", e);
+                Log.e(TAG, "❌ Erro loadBanner: " + e.getMessage());
             }
         });
-    }
-    
-    private void testBannerDirectly() {
-        updateStatus("Teste direto de banner...");
-        loadBanner("ca-app-pub-5799980230102893/9398812287");
-    }
-    
-    private void testConfigDirectly() {
-        updateStatus("Testando URL config...");
-        
-        new Thread(() -> {
-            try {
-                java.net.URL url = new java.net.URL(GITHUB_CONFIG_URL);
-                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(5000);
-                
-                int responseCode = conn.getResponseCode();
-                if (responseCode == 200) {
-                    java.io.BufferedReader reader = new java.io.BufferedReader(
-                        new java.io.InputStreamReader(conn.getInputStream()));
-                    String line;
-                    StringBuilder response = new StringBuilder();
-                    while ((line = reader.readLine()) != null) {
-                        response.append(line);
-                    }
-                    reader.close();
-                    
-                    String finalResponse = response.toString();
-                    runOnUiThread(() -> {
-                        updateStatus("✅ Config OK! Tamanho: " + finalResponse.length());
-                        Log.d(TAG, "Conteúdo: " + finalResponse);
-                    });
-                } else {
-                    runOnUiThread(() -> updateStatus("❌ HTTP " + responseCode));
-                }
-                conn.disconnect();
-            } catch (Exception e) {
-                runOnUiThread(() -> updateStatus("❌ Erro teste: " + e.getMessage()));
-            }
-        }).start();
     }
     
     private void sendConfigToWebView() {
         if (!currentConfig.isEmpty() && webView != null) {
+            String escapedConfig = currentConfig
+                    .replace("\\", "\\\\")
+                    .replace("'", "\\'")
+                    .replace("\n", " ")
+                    .replace("\r", "");
+            
             String jsCode = "javascript:(function() {" +
-                    "console.log('Config recebida do app');" +
-                    "if(window.receiveFromNative) {" +
-                    "  window.receiveFromNative('configUpdated', '" + 
-                    currentConfig.replace("'", "\\'") + "');" +
+                    "try {" +
+                    "  console.log('📦 Recebendo config do app nativo');" +
+                    "  if(window.receiveFromNative) {" +
+                    "    window.receiveFromNative('configUpdated', '" + escapedConfig + "');" +
+                    "    console.log('✅ Config enviada');" +
+                    "  } else {" +
+                    "    console.log('⚠️ receiveFromNative não encontrado');" +
+                    "  }" +
+                    "} catch(e) {" +
+                    "  console.log('❌ Erro:', e);" +
                     "}" +
                     "})()";
+            
             webView.loadUrl(jsCode);
+            Log.d(TAG, "📤 Config enviada para WebView");
         }
     }
     
-    private void updateStatus(String message) {
+    private void sendCommandToWebView(String command) {
+        if (webView != null) {
+            String jsCode = "javascript:(function() {" +
+                    "try {" +
+                    "  if(window.receiveFromNative) {" +
+                    "    window.receiveFromNative('" + command + "', null);" +
+                    "  }" +
+                    "} catch(e) {}" +
+                    "})()";
+            webView.loadUrl(jsCode);
+            Log.d(TAG, "📤 Comando enviado: " + command);
+        }
+    }
+    
+    // Métodos chamados pelo JavaScript
+    public void handleWebCommand(String command) {
+        Log.d(TAG, "📨 Comando do HTML: " + command);
+        
         runOnUiThread(() -> {
-            statusText.setText(message);
-            Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-            Log.d(TAG, message);
+            switch(command) {
+                case "refresh":
+                    loadConfigFromGitHub();
+                    break;
+                case "show_banner":
+                    processConfigAndShowBanner();
+                    break;
+                case "debug":
+                    Toast.makeText(this, "Config: " + (isConfigLoaded ? "carregada" : "vazia"), Toast.LENGTH_SHORT).show();
+                    break;
+                case "config_received":
+                    Log.d(TAG, "✅ HTML confirmou recebimento da config");
+                    break;
+            }
         });
     }
     
-    public void handleWebCommand(String command) {
-        updateStatus("Comando HTML: " + command);
-    }
-    
     public String getCurrentConfig() {
+        Log.d(TAG, "📞 getCurrentConfig() chamado, retornando: " + (currentConfig.isEmpty() ? "vazio" : "config existe"));
+        
+        // Se não tiver config, retorna uma config padrão
+        if (currentConfig.isEmpty()) {
+            String defaultConfig = "{\"app\":{\"nome\":\"Audio Auto Cut\"},\"conteudo\":{\"url\":\"https://www.google.com\"}}";
+            Log.d(TAG, "📝 Retornando config padrão");
+            return defaultConfig;
+        }
+        
         return currentConfig;
     }
     
