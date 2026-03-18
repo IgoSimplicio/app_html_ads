@@ -81,8 +81,7 @@ public class MainActivity extends AppCompatActivity {
         webView.loadUrl(GITHUB_HTML_URL);
     }
     
-    private void loadConfigFromGitHub() {
-        String configUrl = "https://raw.githubusercontent.com/IgoSimplicio/app_html_ads/main/config.json";
+    private final String GITHUB_CONFIG_URL = "https://raw.githubusercontent.com/IgoSimplicio/app_html_ads/main/anuncios.json";
         
         Request request = new Request.Builder()
                 .url(configUrl)
