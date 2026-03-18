@@ -38,7 +38,6 @@
             background-color: white;
         }
         
-        /* Placeholder para o banner nativo */
         .banner-placeholder {
             width: 100%;
             height: 60px;
@@ -49,21 +48,14 @@
             color: #666;
             font-size: 14px;
             border-top: 1px solid #ccc;
-            display: none;
-        }
-        
-        .banner-placeholder.active {
-            display: flex;
         }
         
         .banner-placeholder.ad-loaded {
             background-color: transparent;
             height: auto;
             min-height: 50px;
-            color: transparent;
         }
         
-        /* Interface de controle */
         .control-panel {
             position: fixed;
             top: 10px;
@@ -89,10 +81,6 @@
             justify-content: center;
         }
         
-        .control-btn:hover {
-            background-color: #f0f0f0;
-        }
-        
         .debug-info {
             position: fixed;
             bottom: 80px;
@@ -106,6 +94,8 @@
             font-size: 12px;
             z-index: 2000;
             display: none;
+            max-height: 200px;
+            overflow-y: auto;
         }
         
         .debug-info.show {
@@ -117,30 +107,31 @@
     <div class="container">
         <!-- Painel de controle -->
         <div class="control-panel" id="controlPanel">
-            <button class="control-btn" onclick="loadConfig()" title="Recarregar Configuração">🔄</button>
+            <button class="control-btn" onclick="sendToNative('refresh')" title="Recarregar">🔄</button>
             <button class="control-btn" onclick="toggleDebug()" title="Debug">🐞</button>
-            <button class="control-btn" onclick="sendToNative('refresh')" title="Atualizar Banner">📱</button>
+            <button class="control-btn" onclick="sendToNative('show_banner')" title="Forçar Banner">📱</button>
         </div>
         
-        <!-- Conteúdo principal (iframe) -->
+        <!-- Conteúdo principal -->
         <div class="content" id="contentArea">
-            <iframe id="mainIframe" src="about:blank"></iframe>
+            <iframe id="mainIframe" src="https://www.google.com"></iframe>
         </div>
         
-        <!-- Placeholder para o banner nativo -->
+        <!-- Placeholder do banner -->
         <div class="banner-placeholder" id="bannerPlaceholder">
-            <span>Carregando anúncio...</span>
+            <span>Aguardando anúncio do app nativo...</span>
         </div>
         
-        <!-- Informações de debug -->
+        <!-- Debug info -->
         <div class="debug-info" id="debugInfo">
             <div id="debugContent"></div>
         </div>
     </div>
     
     <script>
-        // Configuração
-        const GITHUB_CONFIG_URL = 'https://raw.githubusercontent.com/IgoSimplicio/app_html_ads/main/config.json';
+        // ============================================
+        // CONFIGURAÇÃO - NÃO TENTA CARREGAR DO GITHUB
+        // ============================================
         
         // Elementos DOM
         const iframe = document.getElementById('mainIframe');
@@ -149,168 +140,135 @@
         const debugContent = document.getElementById('debugContent');
         
         // Estado
-        let appConfig = null;
         let debugMode = false;
+        let hasNativeInterface = false;
         
         // Inicialização
         document.addEventListener('DOMContentLoaded', () => {
-            log('App inicializado');
-            loadConfig();
+            log('HTML inicializado');
+            checkNativeInterface();
             
-            // Verificar se está dentro de um app nativo
-            checkNativeEnvironment();
+            // Mostrar instruções no placeholder
+            updatePlaceholder('Aguardando app nativo...');
         });
         
-        // Carregar configuração do GitHub
-        async function loadConfig() {
-            try {
-                log('Carregando configuração do GitHub...');
-                showPlaceholder('Carregando configuração...');
-                
-                const response = await fetch(GITHUB_CONFIG_URL, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Cache-Control': 'no-cache'
-                    },
-                    mode: 'cors'
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                
-                appConfig = await response.json();
-                log('Configuração carregada:', appConfig);
-                
-                // Aplicar configurações
-                applyConfig();
-                
-                // Enviar configuração para o app nativo
-                sendConfigToNative();
-                
-            } catch (error) {
-                log('Erro ao carregar configuração:', error);
-                showPlaceholder('Erro ao carregar configuração');
-            }
-        }
-        
-        // Aplicar configurações no HTML
-        function applyConfig() {
-            if (appConfig) {
-                // Carregar URL no iframe
-                if (appConfig.conteudo && appConfig.conteudo.url) {
-                    iframe.src = appConfig.conteudo.url;
-                    log('URL carregada:', appConfig.conteudo.url);
-                }
-                
-                // Atualizar placeholder do banner
-                if (appConfig.admob && appConfig.admob.banners) {
-                    const bannerAtivo = appConfig.admob.banners.find(b => b.ativo);
-                    if (bannerAtivo) {
-                        bannerPlaceholder.classList.add('active');
-                        log('Banner ativo encontrado:', bannerAtivo);
-                    }
-                }
-            }
-        }
-        
-        // Enviar configuração para o app nativo
-        function sendConfigToNative() {
-            if (window.AndroidInterface && appConfig) {
-                try {
-                    const configJson = JSON.stringify(appConfig);
-                    AndroidInterface.receiveConfig(configJson);
-                    log('Configuração enviada para o app nativo');
-                } catch (error) {
-                    log('Erro ao enviar para app nativo:', error);
-                }
-            } else {
-                log('App nativo não detectado - modo HTML puro');
-                simulateNativeBanner();
-            }
-        }
-        
-        // Simular banner nativo (apenas para teste em HTML puro)
-        function simulateNativeBanner() {
-            setTimeout(() => {
-                bannerPlaceholder.classList.add('active', 'ad-loaded');
-                bannerPlaceholder.innerHTML = '<div style="background:#4CAF50; width:100%; padding:10px; text-align:center; color:white;">📱 BANNER SIMULADO (app nativo necessário)</div>';
-                log('Banner simulado - instale o app nativo para anúncios reais');
-            }, 2000);
-        }
-        
-        // Verificar ambiente nativo
-        function checkNativeEnvironment() {
+        // Verificar se está dentro do app nativo
+        function checkNativeInterface() {
             if (window.AndroidInterface) {
-                log('✅ Ambiente nativo detectado');
+                hasNativeInterface = true;
+                log('✅ App nativo detectado!');
+                updatePlaceholder('Conectado ao app nativo');
                 
-                // Solicitar configuração atual do app nativo
-                if (AndroidInterface.getConfig) {
-                    const nativeConfig = AndroidInterface.getConfig();
-                    if (nativeConfig) {
-                        try {
-                            appConfig = JSON.parse(nativeConfig);
-                            applyConfig();
-                        } catch (e) {
-                            log('Erro ao processar config nativa');
+                // Solicitar configuração ao app nativo
+                if (window.AndroidInterface.getConfig) {
+                    try {
+                        const config = window.AndroidInterface.getConfig();
+                        if (config) {
+                            log('Config recebida do app:', config);
                         }
+                    } catch (e) {
+                        log('Erro ao ler config nativa');
                     }
                 }
             } else {
-                log('⚠️ Executando em navegador - sem SDK nativo');
+                log('⚠️ Executando em navegador - sem app nativo');
+                updatePlaceholder('Execute dentro do app nativo para ver anúncios');
             }
         }
         
-        // Receber comandos do app nativo
+        // Função chamada pelo app nativo para receber configurações
         window.receiveFromNative = function(command, data) {
-            log('Comando nativo:', command, data);
+            log('📱 Comando nativo:', command, data);
             
             switch(command) {
+                case 'configUpdated':
+                    try {
+                        const config = JSON.parse(data);
+                        log('Configuração atualizada:', config);
+                        
+                        // Atualizar URL se veio na config
+                        if (config.conteudo && config.conteudo.url) {
+                            iframe.src = config.conteudo.url;
+                            log('URL atualizada:', config.conteudo.url);
+                        }
+                        
+                        // Atualizar placeholder
+                        updatePlaceholder('Configuração recebida');
+                        
+                    } catch (e) {
+                        log('Erro ao processar config:', e);
+                    }
+                    break;
+                    
                 case 'bannerLoaded':
-                    bannerPlaceholder.classList.add('active', 'ad-loaded');
+                    log('✅ Banner carregado pelo app nativo');
+                    bannerPlaceholder.classList.add('ad-loaded');
                     bannerPlaceholder.innerHTML = '';
+                    updatePlaceholder('Anúncio carregado!');
                     break;
                     
                 case 'bannerFailed':
-                    showPlaceholder('Falha no anúncio');
+                    log('❌ Falha no banner nativo');
+                    updatePlaceholder('Falha ao carregar anúncio');
                     break;
                     
-                case 'configUpdated':
-                    if (data) {
-                        appConfig = JSON.parse(data);
-                        applyConfig();
-                    }
-                    break;
+                default:
+                    log('Comando desconhecido:', command);
             }
         };
         
-        // Enviar comando para app nativo
+        // Enviar comando para o app nativo
         function sendToNative(command) {
+            log('Enviando comando para app nativo:', command);
+            
             if (window.AndroidInterface) {
-                AndroidInterface.receiveCommand(command);
-                log('Comando enviado:', command);
-            } else {
-                if (command === 'refresh') {
-                    simulateNativeBanner();
+                try {
+                    if (window.AndroidInterface.receiveCommand) {
+                        window.AndroidInterface.receiveCommand(command);
+                    } else {
+                        log('AndroidInterface.receiveCommand não disponível');
+                    }
+                } catch (e) {
+                    log('Erro ao enviar comando:', e);
                 }
-                log('Comando ignorado - não está em app nativo');
+            } else {
+                log('⚠️ App nativo não disponível');
+                updatePlaceholder('App nativo não detectado');
+                
+                // Simular para teste em navegador
+                if (command === 'show_banner') {
+                    simulateBanner();
+                }
             }
         }
         
-        // Funções auxiliares
+        // Simular banner para teste (apenas em navegador)
+        function simulateBanner() {
+            bannerPlaceholder.classList.add('ad-loaded');
+            bannerPlaceholder.innerHTML = '<div style="background:#4CAF50; width:100%; padding:10px; text-align:center; color:white;">🔵 BANNER DE TESTE (modo navegador)</div>';
+            log('Banner simulado - modo navegador');
+        }
+        
+        // Atualizar texto do placeholder
+        function updatePlaceholder(message) {
+            if (!bannerPlaceholder.classList.contains('ad-loaded')) {
+                bannerPlaceholder.innerHTML = `<span>${message}</span>`;
+            }
+        }
+        
+        // Funções de debug
         function log(...args) {
+            const timestamp = new Date().toLocaleTimeString();
+            const message = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg) : arg
+            ).join(' ');
+            
             console.log('[HTML]', ...args);
+            
             if (debugMode) {
-                const timestamp = new Date().toLocaleTimeString();
-                debugContent.innerHTML += `<div>${timestamp}: ${args.join(' ')}</div>`;
+                debugContent.innerHTML += `<div>${timestamp}: ${message}</div>`;
                 debugContent.scrollTop = debugContent.scrollHeight;
             }
-        }
-        
-        function showPlaceholder(message) {
-            bannerPlaceholder.classList.add('active');
-            bannerPlaceholder.innerHTML = `<span>${message}</span>`;
         }
         
         function toggleDebug() {
@@ -319,12 +277,17 @@
             log('Debug mode:', debugMode);
         }
         
-        // Interface para o app nativo
+        // Interface para o app nativo (exposta globalmente)
         window.AndroidInterface = window.AndroidInterface || {
-            receiveConfig: (config) => log('Native bridge: config received'),
-            receiveCommand: (cmd) => log('Native bridge: command received'),
+            receiveCommand: (cmd) => {
+                log('Comando recebido (fallback):', cmd);
+                if (cmd === 'refresh') simulateBanner();
+            },
             getConfig: () => null
         };
+        
+        // Log inicial
+        log('HTML pronto - aguardando conexão com app nativo');
     </script>
 </body>
 </html>
