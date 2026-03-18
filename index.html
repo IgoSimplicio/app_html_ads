@@ -5,9 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Audio Auto Cut - WebView</title>
     
-    <!-- AdMob Script -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5799980230102893"
-     crossorigin="anonymous"></script>
+    <!-- Script do AdMob - Carregado de forma otimizada -->
+    <script>
+        // Pré-carregar o script do AdMob
+        (function() {
+            var admobScript = document.createElement('script');
+            admobScript.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5799980230102893';
+            admobScript.async = true;
+            admobScript.crossOrigin = 'anonymous';
+            document.head.appendChild(admobScript);
+        })();
+    </script>
     
     <style>
         * {
@@ -30,7 +38,7 @@
             flex-direction: column;
         }
 
-        /* Container do iframe - ocupa todo espaço disponível acima do banner */
+        /* Container do iframe - ocupa todo espaço disponível */
         .content-container {
             flex: 1;
             width: 100%;
@@ -39,7 +47,7 @@
             overflow: hidden;
         }
 
-        /* Iframe que ocupa 100% do container */
+        /* Iframe em tela cheia */
         #webview-frame {
             width: 100%;
             height: 100%;
@@ -52,19 +60,30 @@
             bottom: 0;
         }
 
-        /* Container do banner - fixo na parte inferior */
+        /* Container do banner */
         .banner-container {
             width: 100%;
             height: auto;
             min-height: 100px;
             background-color: #f8f8f8;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
             z-index: 1000;
             padding: 5px 0;
             border-top: 1px solid #e0e0e0;
+            position: relative;
+        }
+
+        /* Container do anúncio */
+        .ad-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100px;
         }
 
         /* Estilo do anúncio */
@@ -73,12 +92,30 @@
             width: 320px !important;
             height: 100px !important;
             margin: 0 auto;
+            background-color: transparent;
+        }
+
+        /* Mensagem de fallback */
+        .ad-fallback {
+            display: none;
+            text-align: center;
+            padding: 10px;
+            color: #666;
+            font-size: 14px;
+            width: 100%;
+        }
+
+        .banner-container.no-ad .ad-fallback {
+            display: block;
+        }
+
+        .banner-container.no-ad .adsbygoogle {
+            display: none !important;
         }
 
         /* Loading state */
         .banner-container.loading {
             background-color: #f0f0f0;
-            position: relative;
         }
 
         .banner-container.loading::after {
@@ -88,7 +125,7 @@
             position: absolute;
         }
 
-        /* Overlay de carregamento inicial */
+        /* Overlay de carregamento */
         .loading-overlay {
             position: fixed;
             top: 0;
@@ -113,25 +150,19 @@
             margin-bottom: 10px;
         }
 
-        .loading-text {
-            color: #333;
-            font-size: 16px;
-        }
-
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
 
-        /* Ajustes para diferentes tamanhos de tela */
+        /* Ajustes responsivos */
         @media (max-width: 350px) {
             .adsbygoogle {
-                width: 300px !important;
+                width: 280px !important;
                 height: 80px !important;
             }
         }
 
-        /* Suporte para notch e áreas seguras em iPhones */
         @supports (padding: max(0px)) {
             .banner-container {
                 padding-bottom: max(5px, env(safe-area-inset-bottom));
@@ -140,66 +171,164 @@
     </style>
 </head>
 <body>
-    <!-- Container do iframe (conteúdo do site) -->
+    <!-- Container do iframe -->
     <div class="content-container">
         <iframe 
             id="webview-frame"
             src="https://www.google.com"
             frameborder="0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowfullscreen>
+            allowfullscreen
+            sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation">
         </iframe>
     </div>
     
-    <!-- Container do banner fixo na parte inferior -->
+    <!-- Container do banner -->
     <div class="banner-container" id="bannerContainer">
-        <!-- Banner do AdMob -->
-        <ins class="adsbygoogle"
-             style="display:inline-block;width:320px;height:100px"
-             data-ad-client="ca-pub-5799980230102893"
-             data-ad-slot="9398812287"
-             data-ad-format="banner"
-             data-full-width-responsive="true"></ins>
-        <script>
-            (adsbygoogle = window.adsbygoogle || []).push({});
-        </script>
+        <div class="ad-container" id="adContainer">
+            <!-- Banner do AdMob -->
+            <ins class="adsbygoogle"
+                 style="display:inline-block;width:320px;height:100px"
+                 data-ad-client="ca-pub-5799980230102893"
+                 data-ad-slot="9398812287"
+                 data-ad-format="banner"
+                 data-full-width-responsive="true"
+                 id="adBanner"></ins>
+        </div>
+        <div class="ad-fallback" id="adFallback">
+            Propaganda não disponível no momento
+        </div>
     </div>
     
-    <!-- Loading overlay inicial (opcional) -->
+    <!-- Loading overlay -->
     <div class="loading-overlay" id="loadingOverlay" style="display: none;">
         <div class="loading-spinner"></div>
         <div class="loading-text">Carregando...</div>
     </div>
 
     <script>
-        // Configuração
+        // Configurações
         const GITHUB_CONFIG_URL = 'https://raw.githubusercontent.com/IgoSimplicio/app_html_ads/refs/heads/main/anuncios.json';
         
         // Elementos DOM
         const iframe = document.getElementById('webview-frame');
         const bannerContainer = document.getElementById('bannerContainer');
+        const adContainer = document.getElementById('adContainer');
+        const adFallback = document.getElementById('adFallback');
         const loadingOverlay = document.getElementById('loadingOverlay');
         
         // Estado
         let config = null;
+        let adLoaded = false;
+        let retryCount = 0;
+        const maxRetries = 3;
         
         // Inicialização
         document.addEventListener('DOMContentLoaded', () => {
-            // Garantir que o banner já está sendo exibido
-            console.log('App iniciado - banner deve aparecer');
+            console.log('App iniciado - tentando carregar anúncio...');
             
-            // Carregar configuração do GitHub em segundo plano
+            // Mostrar loading inicial
+            bannerContainer.classList.add('loading');
+            
+            // Tentar carregar o anúncio
+            setTimeout(() => {
+                loadAdWithRetry();
+            }, 500);
+            
+            // Carregar configuração do GitHub
             loadConfigFromGitHub();
             
-            // Evento de load do iframe
+            // Eventos do iframe
             iframe.onload = () => {
                 console.log('Iframe carregado com sucesso');
+                hideLoading();
             };
             
             iframe.onerror = (error) => {
-                console.error('Erro ao carregar iframe:', error);
+                console.error('Erro no iframe:', error);
+                hideLoading();
             };
+            
+            // Verificar se o AdMob carregou
+            checkAdMobLoaded();
         });
+        
+        // Função para verificar se o AdMob está disponível
+        function checkAdMobLoaded() {
+            if (typeof adsbygoogle !== 'undefined') {
+                console.log('AdMob carregado com sucesso');
+            } else {
+                console.log('Aguardando AdMob carregar...');
+                setTimeout(checkAdMobLoaded, 100);
+            }
+        }
+        
+        // Função para carregar anúncio com retry
+        function loadAdWithRetry() {
+            try {
+                if (typeof adsbygoogle !== 'undefined') {
+                    // Tentar carregar o anúncio
+                    (adsbygoogle = window.adsbygoogle || []).push({
+                        google_ad_client: "ca-pub-5799980230102893",
+                        enable_page_level_ads: true
+                    });
+                    
+                    console.log('Anúncio solicitado');
+                    
+                    // Verificar se carregou após alguns segundos
+                    setTimeout(() => {
+                        checkAdLoaded();
+                    }, 2000);
+                    
+                } else {
+                    throw new Error('AdMob não carregado');
+                }
+            } catch (error) {
+                console.error('Erro ao carregar anúncio:', error);
+                
+                if (retryCount < maxRetries) {
+                    retryCount++;
+                    console.log(`Tentativa ${retryCount} de ${maxRetries}...`);
+                    
+                    // Aguardar e tentar novamente
+                    setTimeout(() => {
+                        loadAdWithRetry();
+                    }, 2000 * retryCount); // Aumentar tempo a cada tentativa
+                    
+                } else {
+                    // Mostrar fallback após todas tentativas
+                    showAdFallback();
+                }
+            }
+        }
+        
+        // Função para verificar se o anúncio carregou
+        function checkAdLoaded() {
+            const adElement = document.getElementById('adBanner');
+            
+            // Verificar se o anúncio tem conteúdo
+            if (adElement && adElement.innerHTML && adElement.innerHTML.length > 0) {
+                console.log('Anúncio carregado com sucesso!');
+                bannerContainer.classList.remove('loading');
+                adLoaded = true;
+            } else {
+                console.log('Aguardando anúncio carregar...');
+                
+                // Verificar novamente após 1 segundo
+                setTimeout(() => {
+                    if (!adLoaded) {
+                        checkAdLoaded();
+                    }
+                }, 1000);
+            }
+        }
+        
+        // Função para mostrar fallback quando não há anúncio
+        function showAdFallback() {
+            console.log('Mostrando fallback - anúncio não disponível');
+            bannerContainer.classList.remove('loading');
+            bannerContainer.classList.add('no-ad');
+        }
         
         // Carregar configuração do GitHub
         async function loadConfigFromGitHub() {
@@ -220,7 +349,7 @@
                 console.log('Configuração carregada:', config);
                 
                 // Verificar modo de teste
-                if (config.admob.test_mode) {
+                if (config.admob && config.admob.test_mode) {
                     console.log('Modo de teste ativado');
                 }
                 
@@ -229,37 +358,57 @@
             }
         }
         
-        // Função para recarregar o banner se necessário
-        function reloadBanner() {
-            // Limpar container
-            bannerContainer.innerHTML = '';
-            bannerContainer.classList.add('loading');
-            
-            // Recriar banner
-            const insElement = document.createElement('ins');
-            insElement.className = 'adsbygoogle';
-            insElement.style.display = 'inline-block';
-            insElement.style.width = '320px';
-            insElement.style.height = '100px';
-            insElement.setAttribute('data-ad-client', 'ca-pub-5799980230102893');
-            insElement.setAttribute('data-ad-slot', '9398812287');
-            insElement.setAttribute('data-ad-format', 'banner');
-            insElement.setAttribute('data-full-width-responsive', 'true');
-            
-            bannerContainer.appendChild(insElement);
-            
-            // Recarregar anúncio
-            try {
-                (adsbygoogle = window.adsbygoogle || []).push({});
-                bannerContainer.classList.remove('loading');
-            } catch (error) {
-                console.error('Erro ao recarregar banner:', error);
-                bannerContainer.classList.remove('loading');
+        // Funções de utilidade
+        function showLoading() {
+            if (loadingOverlay) {
+                loadingOverlay.style.display = 'flex';
             }
         }
         
-        // Expor funções globalmente se necessário
-        window.reloadBanner = reloadBanner;
+        function hideLoading() {
+            if (loadingOverlay) {
+                setTimeout(() => {
+                    loadingOverlay.style.display = 'none';
+                }, 500);
+            }
+        }
+        
+        // Função para recarregar o banner manualmente
+        window.reloadBanner = function() {
+            console.log('Recarregando banner manualmente...');
+            bannerContainer.classList.add('loading');
+            bannerContainer.classList.remove('no-ad');
+            retryCount = 0;
+            
+            // Limpar e recriar o elemento do anúncio
+            adContainer.innerHTML = '';
+            
+            const newAdElement = document.createElement('ins');
+            newAdElement.className = 'adsbygoogle';
+            newAdElement.style.display = 'inline-block';
+            newAdElement.style.width = '320px';
+            newAdElement.style.height = '100px';
+            newAdElement.setAttribute('data-ad-client', 'ca-pub-5799980230102893');
+            newAdElement.setAttribute('data-ad-slot', '9398812287');
+            newAdElement.setAttribute('data-ad-format', 'banner');
+            newAdElement.setAttribute('data-full-width-responsive', 'true');
+            newAdElement.id = 'adBanner';
+            
+            adContainer.appendChild(newAdElement);
+            
+            // Tentar carregar novamente
+            setTimeout(() => {
+                loadAdWithRetry();
+            }, 500);
+        };
+        
+        // Se o AdMob não carregar em 10 segundos, mostrar fallback
+        setTimeout(() => {
+            if (!adLoaded) {
+                console.log('Timeout - mostrando fallback');
+                showAdFallback();
+            }
+        }, 10000);
     </script>
 </body>
 </html>
