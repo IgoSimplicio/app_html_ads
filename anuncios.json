@@ -1,13 +1,30 @@
 {
+  "app": {
+    "nome": "Audio Auto Cut",
+    "versao": "1.0.0"
+  },
   "admob": {
     "app_id": "ca-app-pub-5799980230102893~3570820869",
-    "banner_id": "ca-app-pub-5799980230102893/9398812287",
-    "test_mode": false,
-    "test_device_ids": []
+    "banners": [
+      {
+        "id": "banner_principal",
+        "ad_unit_id": "ca-app-pub-5799980230102893/9398812287",
+        "ativo": true,
+        "posicao": "bottom",
+        "tamanho": "BANNER"
+      }
+    ],
+    "intersticiais": [],
+    "recompensados": []
   },
-  "configuracao": {
-    "banner_fixo": true,
-    "atualizacao_automatica": false,
-    "intervalo_atualizacao": 30
+  "conteudo": {
+    "url": "https://www.google.com",
+    "tipo": "webview"
+  },
+  "configuracoes": {
+    "modo_teste": false,
+    "dispositivos_teste": [],
+    "atualizacao_automatica": true,
+    "intervalo_atualizacao": 3600
   }
 }
