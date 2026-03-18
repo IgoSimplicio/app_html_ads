@@ -1,0 +1,13 @@
+{
+  "admob": {
+    "app_id": "ca-app-pub-5799980230102893~3570820869",
+    "banner_id": "ca-app-pub-5799980230102893/9398812287",
+    "test_mode": false,
+    "test_device_ids": []
+  },
+  "configuracao": {
+    "banner_fixo": true,
+    "atualizacao_automatica": false,
+    "intervalo_atualizacao": 30
+  }
+}
