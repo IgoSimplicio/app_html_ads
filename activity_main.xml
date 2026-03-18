@@ -4,21 +4,60 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <!-- WebView para o conteúdo HTML -->
+    <!-- Área de status/diagnóstico -->
+    <TextView
+        android:id="@+id/status_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="8dp"
+        android:text="Iniciando..."
+        android:textColor="@android:color/white"
+        android:background="#2196F3"
+        android:gravity="center"
+        android:textSize="12sp"/>
+
+    <!-- Botões de teste -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="4dp">
+
+        <Button
+            android:id="@+id/btn_test_banner"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Testar Banner"
+            android:layout_margin="2dp"
+            android:textSize="12sp"/>
+
+        <Button
+            android:id="@+id/btn_test_config"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Testar Config"
+            android:layout_margin="2dp"
+            android:textSize="12sp"/>
+
+    </LinearLayout>
+
+    <!-- WebView -->
     <WebView
         android:id="@+id/webview"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1" />
 
-    <!-- Container para o banner -->
+    <!-- Container do banner -->
     <LinearLayout
         android:id="@+id/banner_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:gravity="center"
-        android:background="#f5f5f5"
+        android:background="#E0E0E0"
         android:minHeight="60dp" />
 
 </LinearLayout>
