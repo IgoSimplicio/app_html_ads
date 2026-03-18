@@ -1,6 +1,6 @@
 // Configurações
 const CONFIG = {
-    GITHUB_CONFIG_URL: 'https://raw.githubusercontent.com/SEU_USUARIO/SEU_REPO/main/config/anuncios.json',
+    GITHUB_CONFIG_URL: 'https://raw.githubusercontent.com/IgoSimplicio/app_html_ads/refs/heads/main/anuncios.json',
     DEFAULT_URL: 'https://www.google.com',
     UPDATE_INTERVAL: 30000 // 30 segundos
 };
