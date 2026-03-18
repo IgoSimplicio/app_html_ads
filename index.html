@@ -38,6 +38,16 @@
             background-color: white;
         }
         
+        .status-bar {
+            width: 100%;
+            background-color: #2196F3;
+            color: white;
+            padding: 8px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
         .banner-placeholder {
             width: 100%;
             height: 60px;
@@ -86,7 +96,7 @@
             bottom: 80px;
             left: 10px;
             right: 10px;
-            background-color: rgba(0,0,0,0.8);
+            background-color: rgba(0,0,0,0.9);
             color: #00ff00;
             padding: 10px;
             border-radius: 5px;
@@ -94,106 +104,159 @@
             font-size: 12px;
             z-index: 2000;
             display: none;
-            max-height: 200px;
+            max-height: 300px;
             overflow-y: auto;
+            border: 2px solid #00ff00;
         }
         
         .debug-info.show {
             display: block;
         }
+        
+        .diagnostic-box {
+            background-color: #ffeb3b;
+            color: #000;
+            padding: 5px;
+            margin: 5px 0;
+            border-radius: 3px;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Painel de controle -->
-        <div class="control-panel" id="controlPanel">
-            <button class="control-btn" onclick="sendToNative('refresh')" title="Recarregar">🔄</button>
-            <button class="control-btn" onclick="toggleDebug()" title="Debug">🐞</button>
-            <button class="control-btn" onclick="sendToNative('show_banner')" title="Forçar Banner">📱</button>
-        </div>
-        
-        <!-- Conteúdo principal -->
-        <div class="content" id="contentArea">
-            <iframe id="mainIframe" src="https://www.google.com"></iframe>
-        </div>
-        
-        <!-- Placeholder do banner -->
-        <div class="banner-placeholder" id="bannerPlaceholder">
-            <span>Aguardando anúncio do app nativo...</span>
-        </div>
-        
-        <!-- Debug info -->
-        <div class="debug-info" id="debugInfo">
-            <div id="debugContent"></div>
-        </div>
+    <!-- Barra de status -->
+    <div class="status-bar" id="statusBar">
+        Inicializando...
+    </div>
+    
+    <!-- Painel de controle -->
+    <div class="control-panel" id="controlPanel">
+        <button class="control-btn" onclick="checkNativeInterface()" title="Verificar Conexão">🔍</button>
+        <button class="control-btn" onclick="sendToNative('refresh')" title="Recarregar">🔄</button>
+        <button class="control-btn" onclick="sendToNative('show_banner')" title="Forçar Banner">📱</button>
+        <button class="control-btn" onclick="toggleDebug()" title="Debug">🐞</button>
+    </div>
+    
+    <!-- Conteúdo principal -->
+    <div class="content" id="contentArea">
+        <iframe id="mainIframe" src="https://www.google.com"></iframe>
+    </div>
+    
+    <!-- Placeholder do banner -->
+    <div class="banner-placeholder" id="bannerPlaceholder">
+        <span>Aguardando conexão...</span>
+    </div>
+    
+    <!-- Debug info -->
+    <div class="debug-info" id="debugInfo">
+        <div style="color:yellow; font-weight:bold; margin-bottom:5px;">🔧 DIAGNÓSTICO</div>
+        <div id="debugContent"></div>
     </div>
     
     <script>
-        // ============================================
-        // CONFIGURAÇÃO - NÃO TENTA CARREGAR DO GITHUB
-        // ============================================
-        
         // Elementos DOM
         const iframe = document.getElementById('mainIframe');
         const bannerPlaceholder = document.getElementById('bannerPlaceholder');
         const debugInfo = document.getElementById('debugInfo');
         const debugContent = document.getElementById('debugContent');
+        const statusBar = document.getElementById('statusBar');
         
         // Estado
         let debugMode = false;
-        let hasNativeInterface = false;
+        let checkCount = 0;
         
         // Inicialização
         document.addEventListener('DOMContentLoaded', () => {
-            log('HTML inicializado');
-            checkNativeInterface();
+            log('🚀 HTML inicializado');
+            updateStatus('Inicializando...');
             
-            // Mostrar instruções no placeholder
-            updatePlaceholder('Aguardando app nativo...');
+            // Verificar interface nativa imediatamente
+            setTimeout(checkNativeInterface, 500);
+            setTimeout(checkNativeInterface, 1000);
+            setTimeout(checkNativeInterface, 2000);
+            
+            // Verificar a cada 3 segundos
+            setInterval(checkNativeInterface, 3000);
         });
         
         // Verificar se está dentro do app nativo
         function checkNativeInterface() {
-            if (window.AndroidInterface) {
-                hasNativeInterface = true;
-                log('✅ App nativo detectado!');
+            checkCount++;
+            
+            // Verificar AndroidInterface
+            const hasAndroid = typeof window.AndroidInterface !== 'undefined';
+            const hasReceiveCommand = hasAndroid && typeof window.AndroidInterface.receiveCommand === 'function';
+            const hasGetConfig = hasAndroid && typeof window.AndroidInterface.getConfig === 'function';
+            
+            // Verificar se tem a interface exposta
+            log(`🔍 Verificação #${checkCount}:`);
+            log(`   - AndroidInterface existe: ${hasAndroid}`);
+            log(`   - receiveCommand existe: ${hasReceiveCommand}`);
+            log(`   - getConfig existe: ${hasGetConfig}`);
+            
+            if (hasAndroid) {
+                updateStatus('✅ App nativo detectado!');
                 updatePlaceholder('Conectado ao app nativo');
                 
-                // Solicitar configuração ao app nativo
-                if (window.AndroidInterface.getConfig) {
+                // Tentar obter configuração
+                if (hasGetConfig) {
                     try {
                         const config = window.AndroidInterface.getConfig();
-                        if (config) {
-                            log('Config recebida do app:', config);
+                        log('📦 Config do app nativo:', config);
+                        
+                        if (config && config !== 'null') {
+                            try {
+                                const configObj = JSON.parse(config);
+                                updateStatus('Configuração carregada');
+                                
+                                // Atualizar URL se disponível
+                                if (configObj.conteudo && configObj.conteudo.url) {
+                                    iframe.src = configObj.conteudo.url;
+                                }
+                            } catch (e) {
+                                log('Erro ao parsear config');
+                            }
                         }
                     } catch (e) {
-                        log('Erro ao ler config nativa');
+                        log('Erro ao acessar getConfig:', e);
                     }
                 }
+                
+                // Enviar comando de teste
+                sendToNative('debug');
+                
             } else {
-                log('⚠️ Executando em navegador - sem app nativo');
-                updatePlaceholder('Execute dentro do app nativo para ver anúncios');
+                updateStatus('⚠️ Aguardando app nativo...');
+                updatePlaceholder('Execute dentro do app nativo');
+                
+                // Mostrar instruções no debug
+                if (checkCount === 3) {
+                    log('📌 DICA: Certifique-se que:');
+                    log('   1. O app foi compilado no Android Studio');
+                    log('   2. webView.addJavascriptInterface() foi chamado');
+                    log('   3. O WebAppInterface.java existe');
+                }
             }
         }
         
-        // Função chamada pelo app nativo para receber configurações
+        // Função chamada pelo app nativo
         window.receiveFromNative = function(command, data) {
-            log('📱 Comando nativo:', command, data);
+            log('📱 Comando nativo RECEBIDO:', command, data);
+            updateStatus(`Comando: ${command}`);
             
             switch(command) {
                 case 'configUpdated':
                     try {
-                        const config = JSON.parse(data);
-                        log('Configuração atualizada:', config);
+                        const config = typeof data === 'string' ? JSON.parse(data) : data;
+                        log('Configuração:', config);
+                        updateStatus('Config atualizada');
                         
-                        // Atualizar URL se veio na config
                         if (config.conteudo && config.conteudo.url) {
                             iframe.src = config.conteudo.url;
-                            log('URL atualizada:', config.conteudo.url);
                         }
                         
-                        // Atualizar placeholder
-                        updatePlaceholder('Configuração recebida');
+                        // Notificar app nativo que recebemos
+                        sendToNative('config_received');
                         
                     } catch (e) {
                         log('Erro ao processar config:', e);
@@ -201,55 +264,71 @@
                     break;
                     
                 case 'bannerLoaded':
-                    log('✅ Banner carregado pelo app nativo');
+                    log('✅ Banner carregado pelo app');
                     bannerPlaceholder.classList.add('ad-loaded');
                     bannerPlaceholder.innerHTML = '';
-                    updatePlaceholder('Anúncio carregado!');
+                    updateStatus('Anúncio carregado!');
                     break;
                     
                 case 'bannerFailed':
-                    log('❌ Falha no banner nativo');
+                    log('❌ Falha no banner');
                     updatePlaceholder('Falha ao carregar anúncio');
+                    updateStatus('Falha no banner');
                     break;
-                    
-                default:
-                    log('Comando desconhecido:', command);
             }
         };
         
-        // Enviar comando para o app nativo
+        // Enviar comando para app nativo
         function sendToNative(command) {
-            log('Enviando comando para app nativo:', command);
+            log('📤 Enviando comando:', command);
             
-            if (window.AndroidInterface) {
+            if (window.AndroidInterface && window.AndroidInterface.receiveCommand) {
                 try {
-                    if (window.AndroidInterface.receiveCommand) {
-                        window.AndroidInterface.receiveCommand(command);
-                    } else {
-                        log('AndroidInterface.receiveCommand não disponível');
-                    }
+                    window.AndroidInterface.receiveCommand(command);
+                    log('✅ Comando enviado com sucesso');
                 } catch (e) {
-                    log('Erro ao enviar comando:', e);
+                    log('❌ Erro ao enviar comando:', e);
+                    useFallback(command);
                 }
             } else {
-                log('⚠️ App nativo não disponível');
-                updatePlaceholder('App nativo não detectado');
-                
-                // Simular para teste em navegador
-                if (command === 'show_banner') {
-                    simulateBanner();
-                }
+                log('⚠️ Interface nativa não disponível');
+                useFallback(command);
             }
         }
         
-        // Simular banner para teste (apenas em navegador)
-        function simulateBanner() {
-            bannerPlaceholder.classList.add('ad-loaded');
-            bannerPlaceholder.innerHTML = '<div style="background:#4CAF50; width:100%; padding:10px; text-align:center; color:white;">🔵 BANNER DE TESTE (modo navegador)</div>';
-            log('Banner simulado - modo navegador');
+        // Fallback para teste em navegador
+        function useFallback(command) {
+            log('🔄 Usando fallback para:', command);
+            
+            if (command === 'show_banner') {
+                simulateBanner();
+            } else if (command === 'refresh') {
+                simulateRefresh();
+            }
         }
         
-        // Atualizar texto do placeholder
+        function simulateBanner() {
+            bannerPlaceholder.classList.add('ad-loaded');
+            bannerPlaceholder.innerHTML = '<div style="background:#4CAF50; width:100%; padding:15px; text-align:center; color:white; font-weight:bold;">📱 MODO DE TESTE - Banner Simulado</div>';
+            updateStatus('⚠️ Modo de teste (sem app nativo)');
+            log('🟢 Banner simulado ativado');
+        }
+        
+        function simulateRefresh() {
+            updateStatus('🔄 Recarregando...');
+            setTimeout(() => {
+                iframe.src = iframe.src;
+                updateStatus('Página recarregada');
+            }, 500);
+        }
+        
+        // Atualizar barra de status
+        function updateStatus(message) {
+            statusBar.textContent = message;
+            log('📊 Status:', message);
+        }
+        
+        // Atualizar placeholder
         function updatePlaceholder(message) {
             if (!bannerPlaceholder.classList.contains('ad-loaded')) {
                 bannerPlaceholder.innerHTML = `<span>${message}</span>`;
@@ -259,14 +338,25 @@
         // Funções de debug
         function log(...args) {
             const timestamp = new Date().toLocaleTimeString();
-            const message = args.map(arg => 
-                typeof arg === 'object' ? JSON.stringify(arg) : arg
-            ).join(' ');
+            const message = args.map(arg => {
+                if (typeof arg === 'object') {
+                    try {
+                        return JSON.stringify(arg);
+                    } catch {
+                        return String(arg);
+                    }
+                }
+                return String(arg);
+            }).join(' ');
             
             console.log('[HTML]', ...args);
             
             if (debugMode) {
-                debugContent.innerHTML += `<div>${timestamp}: ${message}</div>`;
+                const line = document.createElement('div');
+                line.style.borderBottom = '1px solid #333';
+                line.style.padding = '2px 0';
+                line.textContent = `${timestamp}: ${message}`;
+                debugContent.appendChild(line);
                 debugContent.scrollTop = debugContent.scrollHeight;
             }
         }
@@ -274,20 +364,35 @@
         function toggleDebug() {
             debugMode = !debugMode;
             debugInfo.classList.toggle('show', debugMode);
-            log('Debug mode:', debugMode);
+            
+            if (debugMode) {
+                // Limpar e mostrar informações atuais
+                debugContent.innerHTML = '';
+                log('🔧 DEBUG ATIVADO');
+                log(`📱 User Agent: ${navigator.userAgent}`);
+                log(`🌐 URL atual: ${window.location.href}`);
+                checkNativeInterface();
+            }
         }
         
-        // Interface para o app nativo (exposta globalmente)
+        // Expor funções globalmente
+        window.checkNativeInterface = checkNativeInterface;
+        window.sendToNative = sendToNative;
+        window.toggleDebug = toggleDebug;
+        
+        // Interface fallback
         window.AndroidInterface = window.AndroidInterface || {
             receiveCommand: (cmd) => {
-                log('Comando recebido (fallback):', cmd);
-                if (cmd === 'refresh') simulateBanner();
+                log('Fallback recebeu:', cmd);
+                useFallback(cmd);
             },
-            getConfig: () => null
+            getConfig: () => {
+                log('Fallback getConfig chamado');
+                return null;
+            }
         };
         
-        // Log inicial
-        log('HTML pronto - aguardando conexão com app nativo');
+        log('✅ HTML carregado completamente');
     </script>
 </body>
 </html>
