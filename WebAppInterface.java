@@ -9,29 +9,30 @@ public class WebAppInterface {
     
     public WebAppInterface(MainActivity activity) {
         this.activity = activity;
+        Log.d(TAG, "WebAppInterface criado");
     }
     
     @JavascriptInterface
     public void receiveConfig(String configJson) {
-        Log.d(TAG, "Recebendo configuração: " + configJson);
-        // Atualizar configuração no app nativo
+        Log.d(TAG, "receiveConfig: " + configJson);
         activity.handleWebCommand("refresh");
     }
     
     @JavascriptInterface
     public void receiveCommand(String command) {
-        Log.d(TAG, "Comando recebido: " + command);
+        Log.d(TAG, "receiveCommand: " + command);
         activity.handleWebCommand(command);
     }
     
     @JavascriptInterface
     public String getConfig() {
-        return activity.getCurrentConfig();
+        String config = activity.getCurrentConfig();
+        Log.d(TAG, "getConfig: " + (config != null ? "config existe" : "config null"));
+        return config;
     }
     
     @JavascriptInterface
     public void showToast(String message) {
-        // Para debug
-        Log.d(TAG, "Toast: " + message);
+        Log.d(TAG, "showToast: " + message);
     }
 }
